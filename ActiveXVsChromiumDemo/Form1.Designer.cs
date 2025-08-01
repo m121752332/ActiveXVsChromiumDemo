@@ -41,6 +41,7 @@ namespace ActiveXVsChromiumDemo
             this.txtUrl.Name = "txtUrl";
             this.txtUrl.Size = new System.Drawing.Size(400, 22);
             this.txtUrl.TabIndex = 2;
+            this.txtUrl.TextChanged += new System.EventHandler(this.txtUrl_TextChanged);
             // 
             // btnLoad
             // 
