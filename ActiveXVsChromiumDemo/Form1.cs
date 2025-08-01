@@ -2,16 +2,15 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using CefSharp;
-using CefSharp.WinForms;
+using Microsoft.Web.WebView2.WinForms;
 
 namespace ActiveXVsChromiumDemo
 {
     public partial class Form1 : Form
     {
-        private ChromiumWebBrowser chromiumBrowser;
+        private WebView2 webView2Browser;
         private WebBrowser activeXBrowser;
-        private bool chromiumInitialized = false;
+        private bool webView2Ready = false;
         private Label lblStatus;
 
         public Form1()
@@ -22,97 +21,70 @@ namespace ActiveXVsChromiumDemo
 
         private void InitializeUI()
         {
-            // ComboBox 設定
-            comboBoxBrowserType.Items.AddRange(new string[] { "ActiveX IE", "Chromium" });
+            comboBoxBrowserType.Items.Clear();
+            comboBoxBrowserType.Items.AddRange(new string[] { "ActiveX IE", "WebView2" });
             comboBoxBrowserType.SelectedIndex = 0;
 
-            // WebBrowser (IE)
-            activeXBrowser = new WebBrowser();
-            activeXBrowser.Dock = DockStyle.Fill;
+            activeXBrowser = new WebBrowser { Dock = DockStyle.Fill };
             panelBrowser.Controls.Add(activeXBrowser);
 
-            lblStatus = new Label();
-            lblStatus.Text = "準備就緒";
-            lblStatus.AutoSize = true;
-            lblStatus.Location = new System.Drawing.Point(12, 550); // 依實際 Form 調整位置
+            lblStatus = new Label
+            {
+                Text = "準備就緒",
+                AutoSize = true,
+                Location = new System.Drawing.Point(12, 550)
+            };
             this.Controls.Add(lblStatus);
         }
 
-        private async Task InitializeChromiumIfNeeded()
+        // 1. 改為回傳 Task
+        private async Task InitWebView2()
         {
-            if (chromiumInitialized) return;
+            if (webView2Ready) return;
 
-            await Task.Run(() =>
+            var sw = Stopwatch.StartNew();
+            lblStatus.Text = "WebView2 初始化中...";
+            Application.DoEvents();
+
+            webView2Browser = new WebView2
             {
-                var settings = new CefSettings();
-
-                // ✅ 1. 設定 Cache 路徑
-                settings.CachePath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "ActiveXVsChromiumDemo", "CefCache");
-
-                // ✅ 2. 初始化
-                Cef.Initialize(settings);
-            });
-
-            // ✅ 3. 預載 example.com 暖機
-            chromiumBrowser = new ChromiumWebBrowser("https://example.com");
-            chromiumBrowser.Dock = DockStyle.Fill;
-
-            // ✅ 4. 加入 LoadingStateChanged 事件
-            chromiumBrowser.LoadingStateChanged += (s, args) =>
-            {
-                this.Invoke((Action)(() =>
-                {
-                    lblStatus.Text = args.IsLoading ? "載入中..." : "完成";
-                }));
+                Dock = DockStyle.Fill,
+                Visible = false
             };
+            panelBrowser.Controls.Add(webView2Browser);
 
-            panelBrowser.Invoke((MethodInvoker)(() =>
-            {
-                panelBrowser.Controls.Add(chromiumBrowser);
-                chromiumBrowser.Visible = false;
-            }));
+            await webView2Browser.EnsureCoreWebView2Async();
 
-            chromiumInitialized = true;
+            webView2Ready = true;
+            sw.Stop();
+            lblStatus.Text = $"WebView2 完成！({sw.ElapsedMilliseconds}ms)";
         }
 
+        // 2. 直接 await InitWebView2()
         private async void btnLoad_Click(object sender, EventArgs e)
         {
             string url = txtUrl.Text.Trim();
-            if (string.IsNullOrEmpty(url))
-            {
-                MessageBox.Show("請輸入網址");
-                return;
-            }
+            if (string.IsNullOrEmpty(url)) url = "https://www.google.com";
+            if (!url.StartsWith("http")) url = "https://" + url;
 
-            string selected = comboBoxBrowserType.SelectedItem.ToString();
-
-            if (selected == "ActiveX IE")
+            if (comboBoxBrowserType.SelectedItem.ToString() == "ActiveX IE")
             {
                 activeXBrowser.Visible = true;
-                if (chromiumBrowser != null)
-                    chromiumBrowser.Visible = false;
-
                 activeXBrowser.Navigate(url);
-                lblStatus.Text = "載入中..."; // 顯示狀態
             }
-            else if (selected == "Chromium")
+            else
             {
-                await InitializeChromiumIfNeeded();
-
+                if (!webView2Ready)
+                    await InitWebView2();
                 activeXBrowser.Visible = false;
-                chromiumBrowser.Visible = true;
-                chromiumBrowser.Load(url);
+                webView2Browser.Visible = true;
+                webView2Browser.CoreWebView2.Navigate(url);
             }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            if (chromiumInitialized)
-            {
-                Cef.Shutdown(); // 很重要，避免 zombie process！
-            }
+            webView2Browser?.Dispose();
             base.OnFormClosing(e);
         }
     }

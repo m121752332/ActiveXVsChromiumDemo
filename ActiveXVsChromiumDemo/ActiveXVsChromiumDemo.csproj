@@ -7,6 +7,8 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CefSharp.WinForms" Version="138.0.170" />
+    <!-- <PackageReference Include="CefSharp.WinForms" Version="138.0.170" /> -->
+    <!-- <PackageReference Include="CefSharp.WinForms" Version="120.2.70" /> -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2210.55" />
   </ItemGroup>
 </Project>
